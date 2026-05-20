@@ -4641,10 +4641,10 @@ async function preloadClientsToDB() {
   const existingIds = new Set(clients.map(c => c.id));
   const existingTableIds = new Set(personalTables.map(t => t.id));
   const today = new Date().toISOString().split('T')[0];
-  const mk2 = (id, name, reps) => ({ uid: id, name, reps, photo: null });
+  const _mk = (id, name, reps, notas='') => ({ uid: id, name, reps, photo: null, notas });
 
   // All client/table preload data (extracted from the inline preload)
-  const preloadData = getPreloadData(today, mk);
+  const preloadData = getPreloadData(today, _mk);
 
   for (const { client, tables } of preloadData) {
     if (!existingIds.has(client.id)) {
@@ -4907,7 +4907,6 @@ function getPreloadData(today, mk) {
   const preloadData = [];
   const cls = [];
   const pts = [];
-  const mk = (id, name, reps, notas='') => ({ uid: id, name, reps, photo: null, notas });
 
   let _currentClientId = null;
   function ensureClient(id, name, goal, notes='') {
