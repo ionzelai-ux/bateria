@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ── SUPABASE CLIENT ──────────────────────────────────────────────────────────
-const SUPA_URL = 'https://fjkvuptxbbtyr tdykdnn.supabase.co';
+const SUPA_URL = 'https://fjkvuptxbbtyrtdykdnn.supabase.co';
 const SUPA_KEY = 'sb_publishable_qrwYeaJX9bNmXZIAUUFBLA_dF2CM7vF';
 const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
@@ -949,11 +949,11 @@ const DB = {
     </div>
   </div>
   <nav class="header-nav">
-    <button class="nav-btn active" onclick="switchView('builder')">📋 Crear Sesión</button>
-    <button class="nav-btn" onclick="switchView('battery')">🗂️ Batería</button>
-    <button class="nav-btn" onclick="switchView('exercises')">🏋️ Ejercicios</button>
-    <button class="nav-btn" onclick="switchView('personal')">👤 Personalizados</button>
-    <button class="nav-btn" onclick="switchView('repo')" style="border-color:rgba(90,126,186,0.5);color:#5a7eba">🔬 Repositorio</button>
+    <button class="nav-btn active" onclick="switchView('builder',this)">📋 Crear Sesión</button>
+    <button class="nav-btn" onclick="switchView('battery',this)">🗂️ Batería</button>
+    <button class="nav-btn" onclick="switchView('exercises',this)">🏋️ Ejercicios</button>
+    <button class="nav-btn" onclick="switchView('personal',this)">👤 Personalizados</button>
+    <button class="nav-btn" onclick="switchView('repo',this)" style="border-color:rgba(90,126,186,0.5);color:#5a7eba">🔬 Repositorio</button>
   </nav>
   <div style="display:flex;gap:6px;margin-left:16px;flex-shrink:0">
     <button onclick="exportData()" style="background:none;border:1px solid var(--border2);color:var(--text-dim);font-family:Oswald,sans-serif;font-size:11px;letter-spacing:1px;padding:7px 12px;cursor:pointer;text-transform:uppercase;transition:all 0.2s" onmouseover="this.style.borderColor='var(--green-light)';this.style.color='var(--green-light)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text-dim)'">📤 Exportar</button>
@@ -1114,7 +1114,7 @@ const DB = {
     <!-- VIEW: CLIENT DETAIL -->
     <div class="view" id="view-client-detail">
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap">
-        <button class="new-session-btn" onclick="switchView('personal')" style="padding:8px 14px">← Volver</button>
+        <button class="new-session-btn" onclick="switchView('personal',this)" style="padding:8px 14px">← Volver</button>
         <div id="clientDetailHeader" style="flex:1"></div>
         <button class="save-session-btn" onclick="openPersonalBuilder(null)">+ Nueva Tabla</button>
       </div>
@@ -1434,12 +1434,12 @@ const FORMATS = ['AMRAP', 'EMOM', 'Tabata', 'For Time', 'Por Rondas', 'Libre'];
 // ═══════════════════════════════════════════
 // VIEWS
 // ═══════════════════════════════════════════
-function switchView(v) {
+function switchView(v, btn) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
   const target = document.getElementById('view-' + v);
   if (target) target.classList.add('active');
-  if (event && event.currentTarget) event.currentTarget.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (v === 'battery')   renderBattery();
   if (v === 'exercises') renderExLibView();
   if (v === 'personal')  { renderClientList(); renderTemplates(); }
@@ -2192,8 +2192,10 @@ function loadSession(id) {
 function switchViewTo(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-  document.getElementById('view-' + v).classList.add('active');
-  document.querySelector('.nav-btn').classList.add('active');
+  const target = document.getElementById('view-' + v);
+  if (target) target.classList.add('active');
+  const firstBtn = document.querySelector('.nav-btn');
+  if (firstBtn) firstBtn.classList.add('active');
   if (v === 'builder') newSession();
 }
 // ═══════════════════════════════════════════
@@ -4566,6 +4568,10 @@ function rowToExercise(r) {
     catPrimary:r.cat_primary, catSecondary:r.cat_secondary,
     materiales:r.materiales||[], desc:r.description, photo:r.photo };
 }
+function rowToSession(r) {
+  return { id:r.id, date:r.date, title:r.title, desc:r.description,
+    type:r.type, photo:r.photo, blocks:r.blocks||[] };
+}
 function rowToPersonalTable(r) {
   return { id:r.id, clientId:r.client_id, title:r.title, desc:r.description,
     goal:r.goal, duration:r.duration, frequency:r.frequency,
@@ -4580,7 +4586,7 @@ async function initApp() {
   document.getElementById('blocksArea').innerHTML = '<div style="color:var(--text-muted);font-family:Oswald,sans-serif;font-size:13px;letter-spacing:2px;padding:20px;text-align:center">CARGANDO DATOS...</div>';
 
   try {
-    // Load all data from Supabase (falls back to localStorage if offline)
+    // Always load fresh from Supabase — don't trust localStorage cache
     const [exRows, sesRows, cliRows, ptRows, tplRows] = await Promise.all([
       DB.getAll('exercises'),
       DB.getAll('sessions'),
@@ -4589,18 +4595,24 @@ async function initApp() {
       DB.getAll('templates'),
     ]);
 
-    exercises      = exRows.map(rowToExercise);
-    sessions       = sesRows;
-    clients        = cliRows;
-    personalTables = ptRows.map(rowToPersonalTable);
-    templates      = tplRows;
+    if (exRows.length > 0) {
+      // Supabase responded — use its data and update local cache
+      exercises      = exRows.map(rowToExercise);
+      sessions       = sesRows.map(rowToSession);
+      clients        = cliRows;
+      personalTables = ptRows.map(rowToPersonalTable);
+      templates      = tplRows.map(r => ({ id:r.id, title:r.title, desc:r.description, goal:r.goal, duration:r.duration, frequency:r.frequency, photo:r.photo, days:r.days||[] }));
 
-    // Also save to localStorage as cache
-    localStorage.setItem('ck_exercises',  JSON.stringify(exercises));
-    localStorage.setItem('ck_sessions',   JSON.stringify(sessions));
-    localStorage.setItem('ck_clients',    JSON.stringify(clients));
-    localStorage.setItem('ck_ptables',    JSON.stringify(personalTables));
-    localStorage.setItem('ck_templates',  JSON.stringify(templates));
+      // Update localStorage cache with fresh Supabase data
+      localStorage.setItem('ck_exercises',  JSON.stringify(exercises));
+      localStorage.setItem('ck_sessions',   JSON.stringify(sessions));
+      localStorage.setItem('ck_clients',    JSON.stringify(clients));
+      localStorage.setItem('ck_ptables',    JSON.stringify(personalTables));
+      localStorage.setItem('ck_templates',  JSON.stringify(templates));
+    } else {
+      // Supabase returned empty — fall back to localStorage
+      throw new Error('Supabase returned empty data');
+    }
 
   } catch(e) {
     console.warn('Loading from localStorage cache:', e);
